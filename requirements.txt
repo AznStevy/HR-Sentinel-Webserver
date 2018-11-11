@@ -1,4 +1,7 @@
 numpy
+motor
+flask
+gunicorn
 ipython
 matplotlib
 sphinx
