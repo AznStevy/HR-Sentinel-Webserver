@@ -5,6 +5,7 @@ gunicorn
 ipython
 matplotlib
 sphinx
+sendgrid
 pytest
 pytest-pep8
 pytest-cov
