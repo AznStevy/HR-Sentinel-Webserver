@@ -6,6 +6,8 @@ import asyncio
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
+app = Flask("heart_rate_sentinel_server")  # some unique identifier
+
 
 class HRMSentinelAPI(object):
     def __init__(self):
@@ -24,7 +26,7 @@ class HRMSentinelAPI(object):
         pass
 
     @app.route("/api/heart_rate/internal_average", methods=["GET"])
-    async def get_internal_average(self, name):
+    async def get_internal_average(self):
         pass
 
     @app.route("/api/new_patient", methods=["POST"])
@@ -35,6 +37,6 @@ class HRMSentinelAPI(object):
     async def post_heart_rate(self):
         pass
 
+
 if __name__ == "__main__":
-    app = Flask("heart_rate_sentinel_server")  # some unique identifier
     app.run(host="127.0.0.1")

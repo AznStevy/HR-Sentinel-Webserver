@@ -11,6 +11,15 @@ class HRMDatabase(object):
     async def add_patient(self, new_patient):
         pass
 
+    async def _check_id_exists(self, patient_id):
+        pass
+
+    async def _check_valid_age(self, age):
+        pass
+
+    async def _check_email(self, email:str):
+        pass
+
     async def remove_patient(self, patient_id):
         pass
 
