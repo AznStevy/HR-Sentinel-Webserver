@@ -14,6 +14,9 @@ class HRMDatabase(object):
         Args:
             new_patient (dict): Dictionary of attributes that describe the patient
 
+        Returns:
+            dict: Dictionary that was put into the database.
+
         """
         if type(new_patient) != dict:
             raise TypeError("Must pass in type dict")
@@ -31,6 +34,7 @@ class HRMDatabase(object):
         }
 
         await self.patients.insert_one(verified_patient)
+        return verified_patient
 
     async def update_patient(self, updated_patient):
         """
