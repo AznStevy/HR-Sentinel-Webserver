@@ -1,11 +1,12 @@
 import os
-import datetime
-from flask import Flask, request, jsonify
+import json
 import hrs_db
 import uvloop
 import asyncio
+import datetime
 import sendgrid
 from sendgrid.helpers.mail import *
+from flask import Flask, request, jsonify
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -25,13 +26,21 @@ class HRMSentinelAPI(object):
 
     @app.route("/api/status/<patient_id>", methods=["GET"])
     async def get_status(self, patient_id):
+        """
+        Returns the status of the patient's most recent heart rate
+        Args:
+            patient_id (str): Status of the patient ID to retrieve.
+
+        Returns:
+            tuple: First element is if tachycardic, second element is timestamp.
+        """
         patient = await self.database.get_patient(patient_id)
+        patient_age = patient["user_age"]
         recent_hr = patient["heart_rates"][-1]
         recent_hr_timestamp = patient["timestamps"][-1]
 
-        is_tachycardic = False
-        if recent_hr > 100:
-            is_tachycardic = True
+        is_tachycardic = self._is_tachychardic(patient_age, recent_hr)
+        if is_tachycardic:
             to_email = patient["attending_email"]
             email_content = "Patient with ID {} is tachychardic.".format(patient_id)
             await self.send_email(to_email,
@@ -39,14 +48,51 @@ class HRMSentinelAPI(object):
                                   email_content=email_content)
         return (is_tachycardic, recent_hr_timestamp)
 
+    def _is_tachychardic(self, age: int, heart_rate: int):
+        """
+        Determines if user is tachychardic based on age and heart rate. Based on:
+        https://pediatricheartspecialists.com/heart-education/18-arrhythmia/177-sinus-tachycardia
+        Args:
+            age (int): Age of the user.
+            heart_rate (int): Heartrate of the user.
+
+        Returns:
+            bool: Whether or not the user is tachychardic .
+
+        """
+        if age <= 6 and heart_rate >= 160:
+            return True
+        elif 6 < age <= 17 and heart_rate >= 120:
+            return True
+        elif age > 17 and heart_rate >= 100:
+            return True
+        return False
+
     @app.route("/api/heart_rate/<patient_id>", methods=["GET"])
-    async def get_heart_rate(self, patient_id):
+    async def get_heart_rate(self, patient_id: str):
+        """
+        Gets all heart rates that were recorded for a patient.
+        Args:
+            patient_id (str): Patient to retrieve info for.
+
+        Returns:
+            list: List of all heartrates for the patient.
+
+        """
         patient = await self.database.get_patient(patient_id)
         all_heartrates = patient["heart_rates"]
         return all_heartrates
 
     @app.route("/api/heart_rate/average/<patient_id>", methods=["GET"])
     async def get_average(self, patient_id):
+        """
+        Gets the average heart rate of all recorded heart rates for a patient
+        Args:
+            patient_id (str): Patient to retrieve info for.
+
+        Returns:
+            float: Average heart rate.
+        """
         patient = await self.database.get_patient(patient_id)
         all_heartrates = patient["heart_rates"]
         return sum(all_heartrates) / len(all_heartrates)
@@ -55,8 +101,13 @@ class HRMSentinelAPI(object):
 
     @app.route("/api/heart_rate/internal_average", methods=["POST"])
     async def post_interval_average(self):
-        content = request.json
+        """
+        Retrieves the average heart rate for all recordings before timestamp.
+        Returns:
+            float: Average heart rate in interval.
 
+        """
+        content = request.json
         if "patient_id" not in content.keys():
             raise AttributeError("Must contain patient_id.")
         if "heart_rate_average_since" not in content.keys():
@@ -78,6 +129,9 @@ class HRMSentinelAPI(object):
 
     @app.route("/api/new_patient", methods=["POST"])
     async def post_new_patient(self):
+        """
+        Adds new patient to the database.
+        """
         new_patient = request.json
         try:
             await self.database.add_patient(new_patient)
@@ -90,6 +144,9 @@ class HRMSentinelAPI(object):
 
     @app.route("/api/heart_rate", methods=["POST"])
     async def post_heart_rate(self):
+        """
+        Posts new heart rate for a patient.
+        """
         content = request.json
         try:
             await self.database.update_patient(content)
