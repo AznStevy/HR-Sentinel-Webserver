@@ -1,4 +1,5 @@
 import motor
+import datetime
 
 
 class HRMDatabase(object):
@@ -22,7 +23,7 @@ class HRMDatabase(object):
             raise TypeError("Must pass in type dict")
 
         # additional checks for attributes
-        patient_id = await self._check_patient_id(new_patient)
+        patient_id, patient_exists = await self._check_patient_id(new_patient)
         user_age = self._check_user_age(new_patient)
         attending_email = self._check_email(new_patient)
 
@@ -30,13 +31,15 @@ class HRMDatabase(object):
         verified_patient = {
             "patient_id": patient_id,
             "user_age": user_age,
-            "attending_email": attending_email
+            "attending_email": attending_email,
+            "timestamps": [],
+            "heart_rates": []
         }
 
         await self.patients.insert_one(verified_patient)
         return verified_patient
 
-    async def update_patient(self, updated_patient):
+    async def update_heart_rate(self, updated_patient):
         """
         Update the information of an existing patient.
         Args:
@@ -51,14 +54,35 @@ class HRMDatabase(object):
         patient_id = updated_patient.get("patient_id")
         if not await self._check_patient_exists(patient_id):
             raise ValueError("The patient does not exist. Please use add_patient.")
+        if "heart_rate" not in updated_patient.keys():
+            raise AttributeError("Must pass heart_rate attribute.")
 
-        user_age = self._check_user_age(updated_patient)
-        attending_email = self._check_email(updated_patient)
+        # current patient information
+        current_time = str(datetime.now())
+        new_heartrate = self._check_heart_rate(updated_patient["heart_rate"])
 
         await self.patients.update_one({"patient_id": patient_id}, {
-            "user_age": user_age,
-            "attending_email": attending_email
+            '$push': {
+                "heart_rates": new_heartrate,
+                "timestamps": current_time
+            }
         })
+
+    async def _check_heart_rate(self, heart_rate: int):
+        """
+        Checks the heart rate to see if it's valid.
+        Args:
+            heart_rate (int): Heart rate as an integer.
+
+        Returns:
+            int: The valid heart rate.
+
+        """
+        if type(heart_rate) != int:
+            raise TypeError("heart_rate must be type int.")
+        if heart_rate < 0:
+            raise ValueError("This is not a valid heart rate.")
+        return heart_rate
 
     async def _check_patient_id(self, new_patient):
         """
@@ -78,10 +102,7 @@ class HRMDatabase(object):
             patient_id = str(patient_id)
 
         patient_exists = await self._check_patient_exists(patient_id)
-        if patient_exists:
-            raise ValueError("patient already exists, please use update_patient")
-
-        return patient_id
+        return patient_id, patient_exists
 
     async def _check_patient_exists(self, patient_id: str):
         """
@@ -166,3 +187,16 @@ class HRMDatabase(object):
         """
         found_patient = await self.patients.find_one({"patient_id": patient_id})
         return found_patient
+
+    async def get_all_patients(self):
+        """
+        Retrieves all patient entries from the database.
+
+        Returns:
+            list: List of all patients.
+
+        """
+        all_patients = []
+        async for patient in self.patients.find_one({}):
+            all_patients.append(patient)
+        return all_patients
