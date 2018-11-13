@@ -1,7 +1,6 @@
 numpy
 motor
 flask
-uvloop
 gunicorn
 ipython
 matplotlib

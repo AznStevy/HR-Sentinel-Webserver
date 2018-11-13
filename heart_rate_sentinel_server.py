@@ -1,30 +1,37 @@
 import os
 import json
 import hrs_db
-import uvloop
 import asyncio
 import datetime
 import sendgrid
 from sendgrid.helpers.mail import *
 from flask import Flask, request, jsonify
 
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
-app = Flask("heart_rate_sentinel_server")  # some unique identifier
-
 
 class HRMSentinelAPI(object):
     def __init__(self, **kwargs):
-        db_name = kwargs.get("name", "heart_rate_sentinel_server")
-        self.database = hrs_db(db_name)
-        config_info = json.load("config.json")
+        app_name = kwargs.get("name", "heart_rate_sentinel_server")
+        # self.database = hrs_db(app_name)
+        self.app = Flask(app_name)  # some unique identifier
+        with open("config.json", 'r') as f:
+            config_info = json.load(f)
         self.sendgrid_API_KEY = config_info["SENDGRID_API_KEY"]
         self.from_email = config_info["from_email"]
 
         # testing in memory
         self.patients = {}
 
-    @app.route("/api/status/<patient_id>", methods=["GET"])
+    def run(self):
+        self.app.run(host="127.0.0.1")
+
+    def _add_url_rules(self):
+        self.app.add_url_rule('/api/', 'status/<patient_id>', self.get_status, options=["GET"])
+        self.app.add_url_rule('/api/', 'heart_rate/<patient_id>', self.get_heart_rate, options=["GET"])
+        self.app.add_url_rule('/api/', 'heart_rate/average/<patient_id>', self.get_average, options=["GET"])
+        self.app.add_url_rule('/api/', 'heart_rate/interval_average', self.post_interval_average, options=["POST"])
+        self.app.add_url_rule('/api/', 'new_patient', self.post_new_patient, options=["POST"])
+        self.app.add_url_rule('/api/', 'heart_rate', self.post_heart_rate, options=["POST"])
+
     async def get_status(self, patient_id):
         """
         Returns the status of the patient's most recent heart rate
@@ -34,7 +41,11 @@ class HRMSentinelAPI(object):
         Returns:
             tuple: First element is if tachycardic, second element is timestamp.
         """
-        patient = await self.database.get_patient(patient_id)
+        # patient = await self.database.get_patient(patient_id)
+        if patient_id not in self.patients:
+            return None
+        patient = self.patients[patient_id]
+
         patient_age = patient["user_age"]
         recent_hr = patient["heart_rates"][-1]
         recent_hr_timestamp = patient["timestamps"][-1]
@@ -68,7 +79,6 @@ class HRMSentinelAPI(object):
             return True
         return False
 
-    @app.route("/api/heart_rate/<patient_id>", methods=["GET"])
     async def get_heart_rate(self, patient_id: str):
         """
         Gets all heart rates that were recorded for a patient.
@@ -79,11 +89,14 @@ class HRMSentinelAPI(object):
             list: List of all heartrates for the patient.
 
         """
-        patient = await self.database.get_patient(patient_id)
+        # patient = await self.database.get_patient(patient_id)
+        if patient_id not in self.patients:
+            return None
+        patient = self.patients[patient_id]
+
         all_heartrates = patient["heart_rates"]
         return all_heartrates
 
-    @app.route("/api/heart_rate/average/<patient_id>", methods=["GET"])
     async def get_average(self, patient_id):
         """
         Gets the average heart rate of all recorded heart rates for a patient
@@ -93,13 +106,16 @@ class HRMSentinelAPI(object):
         Returns:
             float: Average heart rate.
         """
-        patient = await self.database.get_patient(patient_id)
+        # patient = await self.database.get_patient(patient_id)
+        if patient_id not in self.patients:
+            return None
+        patient = self.patients[patient_id]
+
         all_heartrates = patient["heart_rates"]
         return sum(all_heartrates) / len(all_heartrates)
 
     # ---------- post stuff ----------
 
-    @app.route("/api/heart_rate/internal_average", methods=["POST"])
     async def post_interval_average(self):
         """
         Retrieves the average heart rate for all recordings before timestamp.
@@ -117,7 +133,10 @@ class HRMSentinelAPI(object):
         heart_rate_ts = str(content["heart_rate_average_since"])
 
         # get patient
-        patient = await self.database.get_patient(patient_id)
+        # patient = await self.database.get_patient(patient_id)
+        if patient_id not in self.patients:
+            return None
+        patient = self.patients[patient_id]
 
         before_hrs = []
         for i, timestamp in enumerate(patient["timestamps"]):
@@ -127,14 +146,30 @@ class HRMSentinelAPI(object):
         # find all before
         return sum(before_hrs) / len(before_hrs)
 
-    @app.route("/api/new_patient", methods=["POST"])
     async def post_new_patient(self):
         """
         Adds new patient to the database.
         """
         new_patient = request.json
+
+        if "patient_id" not in new_patient:
+            raise AttributeError("Must have patient_id.")
+        if "attending_email" not in new_patient:
+            raise AttributeError("Must have attending_email.")
+        elif "@" not in new_patient["attending_email"]:
+            raise ValueError("Invalid email.")
+        if "user_age" not in new_patient:
+            raise AttributeError("Must have user_age.")
+
+        patient_id = new_patient["patient_id"]
+        new_patient["timestamps"] = []
+        new_patient["heart_rates"] = []
+        self.patients[patient_id] = new_patient
+
+        # mongo stuff
         try:
-            await self.database.add_patient(new_patient)
+            pass
+            # await self.database.add_patient(new_patient)
         except TypeError as e:
             pass
         except AttributeError as e:
@@ -142,14 +177,32 @@ class HRMSentinelAPI(object):
         except ValueError as e:
             pass
 
-    @app.route("/api/heart_rate", methods=["POST"])
     async def post_heart_rate(self):
         """
         Posts new heart rate for a patient.
         """
-        content = request.json
+        updated_heartrate = request.json
+
+        if "patient_id" not in updated_heartrate:
+            raise AttributeError("Must have patient_id.")
+        if "patient_id" not in self.patients:
+            raise ValueError("Patient does not exist yet.")
+        if "heart_rate" not in updated_heartrate:
+            raise AttributeError("Must have heart_rate.")
+        elif type("heart_rate") != int:
+            raise TypeError("heart_rate must be type int.")
+        elif updated_heartrate["heart_rate"] < 0:
+            raise ValueError("Invalid heart rate.")
+
+        patient_id = updated_heartrate["patient_id"]
+        new_hr = updated_heartrate["heart_rate"]
+        new_timestamp = str(datetime.now())
+        self.patients[patient_id]["heart_rates"].append(new_hr)
+        self.patients[patient_id]["timestamps"].append(new_timestamp)
+        # ---------- mongo stuff -------------
         try:
-            await self.database.update_patient(content)
+            pass
+            # await self.database.update_patient(content)
         except TypeError as e:
             pass
         except AttributeError as e:
@@ -168,4 +221,4 @@ class HRMSentinelAPI(object):
 
 if __name__ == "__main__":
     sentinel_api = HRMSentinelAPI()
-    app.run(host="127.0.0.1")
+    sentinel_api.run()
