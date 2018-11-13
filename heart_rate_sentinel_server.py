@@ -78,13 +78,27 @@ class HRMSentinelAPI(object):
 
     @app.route("/api/new_patient", methods=["POST"])
     async def post_new_patient(self):
-        content = request.json
-        await self.database.add_patient()
+        new_patient = request.json
+        try:
+            await self.database.add_patient(new_patient)
+        except TypeError as e:
+            pass
+        except AttributeError as e:
+            pass
+        except ValueError as e:
+            pass
 
     @app.route("/api/heart_rate", methods=["POST"])
     async def post_heart_rate(self):
         content = request.json
-        await self.database.update_patient(content)
+        try:
+            await self.database.update_patient(content)
+        except TypeError as e:
+            pass
+        except AttributeError as e:
+            pass
+        except ValueError as e:
+            pass
 
     async def send_email(self, to_address: str, email_subject: str, email_content: str):
         sg = sendgrid.SendGridAPIClient(apikey=self.sendgrid_API_KEY)
