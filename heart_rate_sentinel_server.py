@@ -1,7 +1,4 @@
-import os
 import json
-import hrs_db
-import asyncio
 import datetime
 import sendgrid
 from sendgrid.helpers.mail import *
@@ -11,11 +8,14 @@ app_name = "heart_rate_sentinel_server"
 # self.database = hrs_db(app_name)
 app = Flask(app_name)
 
-# read in credentials
-with open("config.json", 'r') as f:
-    config_info = json.load(f)
-sendgrid_API_KEY = config_info["SENDGRID_API_KEY"]
-from_email = config_info["from_email"]
+# read in credentials, screws with tests.
+try:
+    with open("config.json", 'r') as f:
+        config_info = json.load(f)
+    sendgrid_API_KEY = config_info["SENDGRID_API_KEY"]
+    from_email = config_info["from_email"]
+except:
+    pass
 
 # testing in memory
 patients = {}
@@ -24,6 +24,12 @@ patients = {}
 # for testing
 @app.route("/api/all_patients", methods=["GET"])
 def get_all():
+    """
+    Gets all patients from the database.
+    Returns:
+        dict: All patients in the database. Key by ID.
+
+    """
     return jsonify(patients)
 
 
@@ -231,6 +237,16 @@ def post_heart_rate():
 
 
 def send_email(to_address: str, email_subject: str, email_content: str):
+    """
+    Sends email regarding heart rate via Sendgrid API.
+    Args:
+        to_address: Address to send to
+        email_subject: Subject of the email.
+        email_content: Content of the email.
+
+    Returns:
+        object: API response from Sendgrid Server.
+    """
     sg = sendgrid.SendGridAPIClient(apikey=sendgrid_API_KEY)
     from_email = config_info["from_email"]
     from_email = Email(from_email)
@@ -238,6 +254,16 @@ def send_email(to_address: str, email_subject: str, email_content: str):
     content = Content("text/plain", email_content)
     mail = Mail(from_email, email_subject, to_email, content)
     response = sg.client.mail.send.post(request_body=mail.get())
+    return response
+
+
+def get_app():
+    """
+    Gets the app (for testing).
+    Returns:
+        object: Flask application object.
+    """
+    return app
 
 
 if __name__ == "__main__":
