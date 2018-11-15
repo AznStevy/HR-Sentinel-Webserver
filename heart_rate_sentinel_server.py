@@ -46,10 +46,13 @@ def get_status(patient_id):
 
     # patient = await self.database.get_patient(patient_id)
     if patient_id not in patients.keys():
-        return None
+        return jsonify(None)
     patient = patients[patient_id]
 
     patient_age = patient["user_age"]
+
+    if not patient["heart_rates"]:
+        return jsonify((None, None))
     recent_hr = patient["heart_rates"][-1]
     recent_hr_timestamp = patient["timestamps"][-1]
 
@@ -65,7 +68,7 @@ def get_status(patient_id):
 
 def _is_tachychardic(age: int, heart_rate: int):
     """
-    Determines if user is tachychardic based on age and heart rate. Based on:
+    Determines if user is tacahychardic based on age and heart rate. Based on:
     https://pediatricheartspecialists.com/heart-education/18-arrhythmia/177-sinus-tachycardia
     Args:
         age (int): Age of the user.
@@ -97,7 +100,7 @@ def get_heart_rate(patient_id: str):
     """
     # patient = await self.database.get_patient(patient_id)
     if patient_id not in patients.keys():
-        return None
+        return jsonify(None)
     patient = patients[patient_id]
 
     all_heartrates = patient["heart_rates"]
@@ -120,6 +123,8 @@ def get_average(patient_id):
     patient = patients[patient_id]
 
     all_heartrates = patient["heart_rates"]
+    if not all_heartrates:
+        return jsonify(None)
     return jsonify(sum(all_heartrates) / len(all_heartrates))
 
 
@@ -169,6 +174,8 @@ def post_new_patient():
 
     if "patient_id" not in new_patient:
         raise AttributeError("Must have patient_id.")
+    if new_patient["patient_id"] in patients.keys():
+        raise ValueError("Patient Already Exists!")
     if "attending_email" not in new_patient:
         raise AttributeError("Must have attending_email.")
     elif "@" not in new_patient["attending_email"]:
