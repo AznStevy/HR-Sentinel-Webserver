@@ -139,9 +139,9 @@ def post_interval_average():
     """
     content = request.get_json()
     if "patient_id" not in content.keys():
-        raise AttributeError("Must contain patient_id.")
+        return error_handler(400, "Must contain patient_id.")
     if "heart_rate_average_since" not in content.keys():
-        raise AttributeError("Must contain heart_rate_average_since")
+        return error_handler(400, "Must contain heart_rate_average_since")
 
     patient_id = str(content["patient_id"])
     heart_rate_ts = str(content["heart_rate_average_since"])
@@ -156,7 +156,6 @@ def post_interval_average():
     # print("Current timestamps: ", patient["timestamps"], "Compare to: ", heart_rate_ts)
     for i, timestamp in enumerate(patient["timestamps"]):
         if heart_rate_ts >= timestamp:
-            print(heart_rate_ts, timestamp)
             before_hrs.append(patient["heart_rates"][i])
 
     if len(before_hrs) < 0:
@@ -173,7 +172,7 @@ def post_new_patient():
     new_patient = request.get_json()
 
     if "patient_id" not in new_patient:
-        raise AttributeError("Must have patient_id.")
+        return error_handler(400, "Must contain patient_id.")
     if new_patient["patient_id"] in patients.keys():
         raise ValueError("Patient Already Exists!")
     if "attending_email" not in new_patient:
@@ -262,6 +261,73 @@ def send_email(to_address: str, email_subject: str, email_content: str):
     mail = Mail(from_email, email_subject, to_email, content)
     response = sg.client.mail.send.post(request_body=mail.get())
     return response
+
+def _is_valid_email(email):
+    """
+    Determines if the email is valid.
+    Args:
+        email: Email to test.
+
+    Returns:
+        bool: If the email is valid.
+
+    """
+    return True
+
+def _patient_exists(patient_id):
+    """
+    Determines if the email exists in the database.
+    Args:
+        patient_id: Patient in question.
+
+    Returns:
+        bool: Whether or not the patient exists in the database.
+
+    """
+    return False
+
+def _is_valid_heart_rate(heart_rate):
+    """
+    Determines if the heart rate is valid.
+    Args:
+        heart_rate: Heart rate in question.
+
+    Returns:
+        bool: Whether or not the heart rate is valid.
+
+    """
+    return True
+
+def _is_valid_timestamp(timestamp):
+    """
+    Determines if the timestamp for is valid.
+    Args:
+        timestamp (str): Time stamp string in question
+
+    Returns:
+        bool: Whether or not the time stamp is valid.
+
+    """
+    return True
+
+def error_handler(status_code, msg, error_type):
+    """
+    Handles errors to send back to requester.
+    Args:
+        status_code: The status code, standard.
+        msg: Message to send.
+        error_type: Error type if raises exception.
+
+    Returns:
+        dict: Error message information.
+
+    """
+    error_msg = {
+        "status_code": status_code,
+        "msg": msg,
+        "error_type": error_type
+    }
+    return error_msg
 
 
 def get_app():
