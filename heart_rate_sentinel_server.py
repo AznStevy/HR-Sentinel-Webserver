@@ -177,6 +177,7 @@ def post_new_patient():
     return jsonify(new_patient)
 
     # mongo stuff
+    """
     try:
         pass
         # await self.database.add_patient(new_patient)
@@ -185,7 +186,7 @@ def post_new_patient():
     except AttributeError as e:
         pass
     except ValueError as e:
-        pass
+        pass"""
 
 
 @app.route("/api/heart_rate", methods=["POST"])
@@ -217,6 +218,7 @@ def post_heart_rate():
     return jsonify(patients[patient_id])
 
     # ---------- mongo stuff -------------
+    """
     try:
         pass
         # await self.database.update_patient(content)
@@ -225,7 +227,7 @@ def post_heart_rate():
     except AttributeError as e:
         pass
     except ValueError as e:
-        pass
+        pass"""
 
 
 def send_email(to_address: str, email_subject: str, email_content: str):
