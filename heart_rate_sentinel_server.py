@@ -45,7 +45,7 @@ def get_status(patient_id):
     """
 
     # patient = await self.database.get_patient(patient_id)
-    if patient_id not in patients.keys():
+    if not _check_patient_exists(patient_id):
         return jsonify(None)
     patient = patients[patient_id]
 
@@ -99,8 +99,9 @@ def get_heart_rate(patient_id: str):
 
     """
     # patient = await self.database.get_patient(patient_id)
-    if patient_id not in patients.keys():
-        return jsonify(None)
+    if not _check_patient_exists(patient_id):
+        return error_handler(500, "User does not exist.", "ValueError")
+
     patient = patients[patient_id]
 
     all_heartrates = patient["heart_rates"]
@@ -118,13 +119,13 @@ def get_average(patient_id):
         float: Average heart rate.
     """
     # patient = await self.database.get_patient(patient_id)
-    if patient_id not in patients.keys():
-        return None
+    if not _check_patient_exists(patient_id):
+        return error_handler(500, "User does not exist.", "ValueError")
     patient = patients[patient_id]
 
     all_heartrates = patient["heart_rates"]
     if not all_heartrates:
-        return jsonify(None)
+        return jsonify({})
     return jsonify(sum(all_heartrates) / len(all_heartrates))
 
 
@@ -139,17 +140,17 @@ def post_interval_average():
     """
     content = request.get_json()
     if "patient_id" not in content.keys():
-        return error_handler(400, "Must contain patient_id.")
+        return error_handler(400, "Must contain patient_id.", "AttributeError")
     if "heart_rate_average_since" not in content.keys():
-        return error_handler(400, "Must contain heart_rate_average_since")
+        return error_handler(400, "Must contain heart_rate_average_since", "AttributeError")
 
     patient_id = str(content["patient_id"])
     heart_rate_ts = str(content["heart_rate_average_since"])
 
     # get patient
     # patient = await self.database.get_patient(patient_id)
-    if patient_id not in patients.keys():
-        return None
+    if not _check_patient_exists(patient_id):
+        return error_handler(500, "User does not exist.", "ValueError")
     patient = patients[patient_id]
 
     before_hrs = []
@@ -159,7 +160,7 @@ def post_interval_average():
             before_hrs.append(patient["heart_rates"][i])
 
     if len(before_hrs) < 0:
-        return None
+        return jsonify(None)
 
     return jsonify(sum(before_hrs) / len(before_hrs))
 
@@ -172,15 +173,17 @@ def post_new_patient():
     new_patient = request.get_json()
 
     if "patient_id" not in new_patient:
-        return error_handler(400, "Must contain patient_id.")
+        return error_handler(400, "Must contain patient_id.", "AttributeError")
     if new_patient["patient_id"] in patients.keys():
-        raise ValueError("Patient Already Exists!")
+        return error_handler(400, "Patient Already Exists!", "ValueError")
     if "attending_email" not in new_patient:
-        raise AttributeError("Must have attending_email.")
-    elif "@" not in new_patient["attending_email"]:
-        raise ValueError("Invalid email.")
+        return error_handler(400, "Must have attending_email.", "AttributeError")
+    elif not _is_valid_email(new_patient["attending_email"]):
+        return error_handler(400, "Invalid email.", "ValueError")
     if "user_age" not in new_patient:
-        raise AttributeError("Must have user_age.")
+        return error_handler(400, "Must have user_age.", "AttributeError")
+    elif not _is_valid_age(new_patient["user_age"]):
+        return error_handler(400, "Invalid user_age.", "ValueError")
 
     patient_id = new_patient["patient_id"]
     new_patient["timestamps"] = []
@@ -209,19 +212,20 @@ def post_heart_rate():
     updated_heartrate = request.get_json()
 
     if "patient_id" not in updated_heartrate:
-        raise AttributeError("Must have patient_id.")
+        return error_handler(400, "Must have patient_id.", "AttributeError")
 
     patient_id = updated_heartrate["patient_id"]
     if patient_id not in patients.keys():
-        raise ValueError("Patient does not exist yet.")
+        return error_handler(400, "Patient does not exist yet.", "ValueError")
 
     if "heart_rate" not in updated_heartrate:
-        raise AttributeError("Must have heart_rate.")
+        return error_handler(400, "Must have heart_rate.", "AttributeError")
+
     new_hr = updated_heartrate["heart_rate"]
     if type(new_hr) != int:
-        raise TypeError("heart_rate must be type int.")
+        return error_handler(400, "heart_rate must be type int.", "TypeError")
     if new_hr < 0:
-        raise ValueError("Invalid heart rate.")
+        return error_handler(400, "Invalid heart rate.", "ValueError")
 
     new_hr = updated_heartrate["heart_rate"]
     new_timestamp = str(datetime.datetime.now())
@@ -262,6 +266,7 @@ def send_email(to_address: str, email_subject: str, email_content: str):
     response = sg.client.mail.send.post(request_body=mail.get())
     return response
 
+
 def _is_valid_email(email):
     """
     Determines if the email is valid.
@@ -272,9 +277,31 @@ def _is_valid_email(email):
         bool: If the email is valid.
 
     """
+    if "@" not in email:
+        return False
+    if "." not in email:
+        return False
     return True
 
-def _patient_exists(patient_id):
+
+def _is_valid_age(user_age):
+    """
+    Determines if the age is valid.
+    Args:
+        user_age: Age to test.
+
+    Returns:
+        bool: If the age is valid.
+
+    """
+    if type(user_age) != int:
+        return False
+    elif user_age < 0:
+        return False
+    return True
+
+
+def _check_patient_exists(patient_id):
     """
     Determines if the email exists in the database.
     Args:
@@ -284,7 +311,10 @@ def _patient_exists(patient_id):
         bool: Whether or not the patient exists in the database.
 
     """
-    return False
+    if patient_id not in patients.keys():
+        return False
+    return True
+
 
 def _is_valid_heart_rate(heart_rate):
     """
@@ -296,7 +326,12 @@ def _is_valid_heart_rate(heart_rate):
         bool: Whether or not the heart rate is valid.
 
     """
+    if type(heart_rate) != int:
+        return False
+    if heart_rate < 0:
+        return False
     return True
+
 
 def _is_valid_timestamp(timestamp):
     """
@@ -308,7 +343,10 @@ def _is_valid_timestamp(timestamp):
         bool: Whether or not the time stamp is valid.
 
     """
+    if type(timestamp) != str:
+        return False
     return True
+
 
 def error_handler(status_code, msg, error_type):
     """
@@ -327,7 +365,7 @@ def error_handler(status_code, msg, error_type):
         "msg": msg,
         "error_type": error_type
     }
-    return error_msg
+    return jsonify(error_msg)
 
 
 def get_app():

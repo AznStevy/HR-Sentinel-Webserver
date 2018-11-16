@@ -152,7 +152,7 @@ if __name__ == "__main__":
     print(p_id)
     # p_id = "UZNUWUPQPI"
     r = add_new_patient(p_id, "szx2@duke.edu", 21)
-    print(get_all_patients())
+    print(r, get_all_patients())
     r = post_heart_rate(p_id, 80)
     print("Posted: ", r)
     hr = get_heart_rate(p_id)

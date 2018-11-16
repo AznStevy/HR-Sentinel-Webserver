@@ -64,7 +64,7 @@ def test_post_new_patient_no_id(flask_app, patient_1_info):
         "user_age": 21
     }
     resp = client.post('/api/new_patient', json=patient)
-    assert resp.status_code == 500
+    assert resp.json["status_code"] == 400
 
 
 def test_post_new_patient_existing_id(flask_app, patient_1_info):
@@ -72,7 +72,7 @@ def test_post_new_patient_existing_id(flask_app, patient_1_info):
     client.post('/api/new_patient', json=patient_1_info)
     resp = client.post('/api/new_patient', json=patient_1_info)
 
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "ValueError"
 
 
 def test_post_new_patient_no_email(flask_app):
@@ -82,7 +82,7 @@ def test_post_new_patient_no_email(flask_app):
         "user_age": 21
     }
     resp = client.post('/api/new_patient', json=patient)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_post_new_patient_bad_email(flask_app, patient_1_info):
@@ -93,7 +93,7 @@ def test_post_new_patient_bad_email(flask_app, patient_1_info):
         "user_age": 21
     }
     resp = client.post('/api/new_patient', json=patient)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "ValueError"
 
 
 def test_post_new_patient_no_age(flask_app):
@@ -103,7 +103,7 @@ def test_post_new_patient_no_age(flask_app):
         "attending_email": "random@duke.edu",
     }
     resp = client.post('/api/new_patient', json=patient)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_post_heart_rate(flask_app, patient_1_info, heart_rate_p1):
@@ -120,17 +120,17 @@ def test_post_heart_rate_no_id(flask_app, patient_1_info, heart_rate_p1):
         "heart_rate": 100
     }
     resp = client.post('/api/heart_rate', json=payload)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_post_heart_rate_no_hr(flask_app, patient_1_info, heart_rate_p1):
     client = flask_app.test_client()
     client.post('/api/new_patient', json=patient_1_info)
     payload = {
-        "patient_id": 123141
+        "patient_id": 1
     }
     resp = client.post('/api/heart_rate', json=payload)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_get_interval_average(flask_app, patient_1_info, heart_rate_p1):
@@ -163,7 +163,7 @@ def test_get_interval_average_no_id(flask_app, patient_1_info, heart_rate_p1):
         "heart_rate_average_since": datetime.datetime.now(),
     }
     resp = client.post('/api/heart_rate/interval_average', json=payload)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_get_interval_average_no_time(flask_app, patient_1_info, heart_rate_p1):
@@ -179,7 +179,7 @@ def test_get_interval_average_no_time(flask_app, patient_1_info, heart_rate_p1):
         "patient_id": p_id
     }
     resp = client.post('/api/heart_rate/interval_average', json=payload)
-    assert resp.status_code == 500
+    assert resp.json["error_type"] == "AttributeError"
 
 
 def test_get_status(flask_app, patient_1_info, heart_rate_p1):
