@@ -15,14 +15,15 @@ The `config.json` file is mostly used for the Sendgrid API. The structure should
 ```
 
 ## Environment Set-up
-To set up the environment, use `pip install -r requirements.txt". This was only tested on 3.6 so far.
+To set up the environment, you first need to set up a virtual environment using `python3 -m venv env
+` in the project folder (if you're on linux). Then use `pip install -r requirements.txt`. If you don't have pip, then you should do `sudo apt-get update` and `sudo apt-get -y upgrade` to update packages and then do `sudo apt-get install python-pip` to isntall pip. This was only tested with python 3.6 so far.
 
 ## Run web server
 To run the `flask` web server, it's best to do so on a screen. The most painless way is to do:
 ```
 screen -S test -d -m python heart_rate_sentinel_server.py
 ```
-which creates the screen and then immediately detaches it.
+which creates the screen and then immediately detaches it. You may need to use `python3` instead if python is python2 by default on the system.
 
 ## HRDatabase
 The project was first done by storing everything in RAM, getting that to work, and then moving on to a mongo implementation. Thus, the goal of this class was to be as least intrusive to existing code as possible. The structure of each entry contains the 5 attributes that were designated in the assignment. The  `HRDatabase` class contains typical functions that allow for simple addition, removal, and search of patients. No test functions were implemented for this because I was told we didn't need it.
