@@ -5,8 +5,10 @@ from random import choice
 from string import ascii_uppercase
 from heart_rate_sentinel_server import get_app
 
+
 def _new_patient_id():
     return ''.join(choice(ascii_uppercase) for _ in range(10))
+
 
 @pytest.fixture()
 def flask_app():
@@ -232,11 +234,16 @@ def test_get_average(flask_app, patient_1_info, heart_rate_p1):
 
 
 @pytest.mark.parametrize("age, hr, expect", [
-    (4, 190, True),
-    (10, 130, True),
-    (18, 110, True),
-    (4, 80, False),
-    (18, 80, False)
+    (1, 190, True),
+    (3, 130, False),
+    (3, 140, True),
+    (5, 110, False),
+    (5, 170, True),
+    (11, 80, False),
+    (15, 80, False),
+    (15, 120, True),
+    (17, 80, False),
+    (17, 120, True),
 ])
 def test__is_tachychardic(age, hr, expect):
     from heart_rate_sentinel_server import _is_tachychardic

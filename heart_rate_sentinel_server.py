@@ -70,8 +70,7 @@ def get_status(patient_id):
 
 def _is_tachychardic(age: int, heart_rate: int):
     """
-    Determines if user is tacahychardic based on age and heart rate. Based on:
-    https://pediatricheartspecialists.com/heart-education/18-arrhythmia/177-sinus-tachycardia
+    Determines if user is tacahychardic based on age and heart rate. Based on: https://en.wikipedia.org/wiki/Tachycardia
     Args:
         age (int): Age of the user.
         heart_rate (int): Heartrate of the user.
@@ -80,11 +79,17 @@ def _is_tachychardic(age: int, heart_rate: int):
         bool: Whether or not the user is tachychardic .
 
     """
-    if age <= 6 and heart_rate >= 160:
+    if 1 <= age <= 2 and heart_rate > 151:
         return True
-    elif 6 < age <= 17 and heart_rate >= 120:
+    elif 3 <= age <= 4 and heart_rate > 137:
         return True
-    elif age > 17 and heart_rate >= 100:
+    elif 5 <= age <= 7 and heart_rate > 133:
+        return True
+    elif 8 <= age <= 11 and heart_rate > 130:
+        return True
+    elif 12 <= age <= 15 and heart_rate > 119:
+        return True
+    elif age > 15 and heart_rate > 100:
         return True
     return False
 
