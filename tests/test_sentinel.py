@@ -3,7 +3,7 @@ import pytest
 import datetime
 from random import choice
 from string import ascii_uppercase
-from heart_rate_sentinel_server import get_app, _is_tachychardic
+from heart_rate_sentinel_server import get_app
 
 
 @pytest.fixture()
@@ -230,4 +230,36 @@ def test_get_average(flask_app, patient_1_info, heart_rate_p1):
     (18, 80, False)
 ])
 def test__is_tachychardic(age, hr, expect):
+    from heart_rate_sentinel_server import _is_tachychardic
     assert _is_tachychardic(age, hr) == expect
+
+
+@pytest.mark.parametrize("email, expect", [
+    ("test@gmail.com", True),
+    ("testgmail.com", False),
+    ("test@gmailcom", False),
+])
+def test__is_valid_email(email, expect):
+    from heart_rate_sentinel_server import _is_valid_email
+    assert _is_valid_email(email) == expect
+
+
+@pytest.mark.parametrize("age, expect", [
+    (18, True),
+    ("3", False),
+    (2.5, False),
+])
+def test__is_valid_age(age, expect):
+    from heart_rate_sentinel_server import _is_valid_age
+    assert _is_valid_age(age) == expect
+
+
+@pytest.mark.parametrize("heart_rate, expect", [
+    (123, True),
+    (123.4, False),
+    (-345, False),
+    ("test", False),
+])
+def test__is_valid_heart_rate(heart_rate, expect):
+    from heart_rate_sentinel_server import _is_valid_heart_rate
+    assert _is_valid_heart_rate(heart_rate) == expect
