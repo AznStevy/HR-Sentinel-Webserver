@@ -1,7 +1,10 @@
 # heart_rate_sentinel_server
 [![Build Status](https://travis-ci.com/AznStevy/heart_rate_sentinel_server.svg?branch=master)](https://travis-ci.com/AznStevy/heart_rate_sentinel_server)
 
-The heart rate sentinel server is meant to be a primer into web infrastructure. Here, `flask` is used to handle most of the backend routing. The server currently uses a sandbox mlab mongo database to store data. The IP of this is a secret :).
+The heart rate sentinel server is meant to be a primer into web infrastructure. Here, `flask` is used to handle most of the backend routing. The server currently uses a sandbox mlab mongo database to store data. You can accessed the deployed version using a command like the following:
+```
+http://vcm-7308.vm.duke.edu:5000/api/heart_rate/LFYXEBJKHY
+```
 
 ## Configuration
 The `config.json` file is mostly used for the Sendgrid API. The structure should be as follows, where `SENDGRID_API_KEY` is your key, and `from_email` is the email you wish to send from. You must also provide mongo credentials in order to allow the app to access the database. These are submitted on Sakai... they are also committed in `config.json` because the data isn't real...
