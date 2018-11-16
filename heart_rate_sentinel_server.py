@@ -260,8 +260,11 @@ def send_email(to_address: str, email_subject: str, email_content: str):
     sg = sendgrid.SendGridAPIClient(apikey=sendgrid_API_KEY)
     from_email = config_info["from_email"]
     from_email = Email(from_email)
+
     to_email = Email(to_address)
+
     content = Content("text/plain", email_content)
+
     mail = Mail(from_email, email_subject, to_email, content)
     response = sg.client.mail.send.post(request_body=mail.get())
     return response
