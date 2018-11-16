@@ -7,6 +7,5 @@ matplotlib
 sphinx
 sendgrid
 pytest
-pytest-flask
 pytest-pep8
 pytest-cov
