@@ -1,6 +1,7 @@
 import json
 import datetime
 import sendgrid
+from hrs_db import HRDatabase
 from sendgrid.helpers.mail import *
 from flask import Flask, request, jsonify
 
@@ -18,7 +19,10 @@ except:
     pass
 
 # testing in memory
-patients = {}
+# patients = {}
+
+# testing using DM
+patients = HRDatabase()
 
 
 # for testing
@@ -30,7 +34,7 @@ def get_all():
         dict: All patients in the database. Key by ID.
 
     """
-    return jsonify(patients)
+    return jsonify(patients.get_all())
 
 
 @app.route("/api/status/<patient_id>", methods=["GET"])
@@ -44,21 +48,19 @@ def get_status(patient_id):
         tuple: First element is if tachycardic, second element is timestamp.
     """
 
-    # patient = await self.database.get_patient(patient_id)
-    if not _check_patient_exists(patient_id):
-        return jsonify(None)
-    patient = patients[patient_id]
+    patient = patients.get_patient(patient_id)
+    if patient is None:
+        return error_handler(500, "User does not exist.", "ValueError")
+    patient_age = patient.user_age
 
-    patient_age = patient["user_age"]
-
-    if not patient["heart_rates"]:
+    if patient.heart_rates == []:
         return jsonify((None, None))
-    recent_hr = patient["heart_rates"][-1]
-    recent_hr_timestamp = patient["timestamps"][-1]
+    recent_hr = patient.heart_rates[-1]
+    recent_hr_timestamp = patient.timestamps[-1]
 
     is_tachycardic = _is_tachychardic(patient_age, recent_hr)
     if is_tachycardic:
-        to_email = patient["attending_email"]
+        to_email = patient.attending_email
         email_content = "Patient with ID {} is tachychardic.".format(patient_id)
         send_email(to_email,
                    email_subject="Patient Tachychardic",
@@ -99,12 +101,11 @@ def get_heart_rate(patient_id: str):
 
     """
     # patient = await self.database.get_patient(patient_id)
-    if not _check_patient_exists(patient_id):
+    patient = patients.get_patient(patient_id)
+    if patient is None:
         return error_handler(500, "User does not exist.", "ValueError")
 
-    patient = patients[patient_id]
-
-    all_heartrates = patient["heart_rates"]
+    all_heartrates = patient.heart_rates
     return jsonify(all_heartrates)
 
 
@@ -118,12 +119,11 @@ def get_average(patient_id):
     Returns:
         float: Average heart rate.
     """
-    # patient = await self.database.get_patient(patient_id)
-    if not _check_patient_exists(patient_id):
+    patient = patients.get_patient(patient_id)
+    if patient is None:
         return error_handler(500, "User does not exist.", "ValueError")
-    patient = patients[patient_id]
 
-    all_heartrates = patient["heart_rates"]
+    all_heartrates = patient.heart_rates
     if not all_heartrates:
         return jsonify({})
     return jsonify(sum(all_heartrates) / len(all_heartrates))
@@ -149,15 +149,15 @@ def post_interval_average():
 
     # get patient
     # patient = await self.database.get_patient(patient_id)
-    if not _check_patient_exists(patient_id):
+    patient = patients.get_patient(patient_id)
+    if patient is None:
         return error_handler(500, "User does not exist.", "ValueError")
-    patient = patients[patient_id]
 
     before_hrs = []
     # print("Current timestamps: ", patient["timestamps"], "Compare to: ", heart_rate_ts)
-    for i, timestamp in enumerate(patient["timestamps"]):
+    for i, timestamp in enumerate(patient.timestamps):
         if heart_rate_ts >= timestamp:
-            before_hrs.append(patient["heart_rates"][i])
+            before_hrs.append(patient.heart_rates[i])
 
     if len(before_hrs) < 0:
         return jsonify(None)
@@ -174,7 +174,11 @@ def post_new_patient():
 
     if "patient_id" not in new_patient:
         return error_handler(400, "Must contain patient_id.", "AttributeError")
-    if new_patient["patient_id"] in patients.keys():
+
+    patient_id = new_patient["patient_id"]
+    patient = patients.get_patient(patient_id)
+
+    if patient is not None:
         return error_handler(400, "Patient Already Exists!", "ValueError")
     if "attending_email" not in new_patient:
         return error_handler(400, "Must have attending_email.", "AttributeError")
@@ -185,23 +189,8 @@ def post_new_patient():
     elif not _is_valid_age(new_patient["user_age"]):
         return error_handler(400, "Invalid user_age.", "ValueError")
 
-    patient_id = new_patient["patient_id"]
-    new_patient["timestamps"] = []
-    new_patient["heart_rates"] = []
-    patients[patient_id] = new_patient
+    patients.add_patient(new_patient)
     return jsonify(new_patient)
-
-    # mongo stuff
-    """
-    try:
-        pass
-        # await self.database.add_patient(new_patient)
-    except TypeError as e:
-        pass
-    except AttributeError as e:
-        pass
-    except ValueError as e:
-        pass"""
 
 
 @app.route("/api/heart_rate", methods=["POST"])
@@ -215,7 +204,8 @@ def post_heart_rate():
         return error_handler(400, "Must have patient_id.", "AttributeError")
 
     patient_id = updated_heartrate["patient_id"]
-    if patient_id not in patients.keys():
+    patient = patients.get_patient(patient_id)
+    if patient is None:
         return error_handler(400, "Patient does not exist yet.", "ValueError")
 
     if "heart_rate" not in updated_heartrate:
@@ -229,21 +219,11 @@ def post_heart_rate():
 
     new_hr = updated_heartrate["heart_rate"]
     new_timestamp = str(datetime.datetime.now())
-    patients[patient_id]["heart_rates"].append(new_hr)
-    patients[patient_id]["timestamps"].append(new_timestamp)
-    return jsonify(patients[patient_id])
 
-    # ---------- mongo stuff -------------
-    """
-    try:
-        pass
-        # await self.database.update_patient(content)
-    except TypeError as e:
-        pass
-    except AttributeError as e:
-        pass
-    except ValueError as e:
-        pass"""
+    patients.add_hr(patient_id, new_hr, new_timestamp)
+    patient = patients.get_patient(patient_id)
+    updated_info = patients.convert_to_json(patient)
+    return jsonify(updated_info)
 
 
 def send_email(to_address: str, email_subject: str, email_content: str):
@@ -300,21 +280,6 @@ def _is_valid_age(user_age):
     if type(user_age) != int:
         return False
     elif user_age < 0:
-        return False
-    return True
-
-
-def _check_patient_exists(patient_id):
-    """
-    Determines if the email exists in the database.
-    Args:
-        patient_id: Patient in question.
-
-    Returns:
-        bool: Whether or not the patient exists in the database.
-
-    """
-    if patient_id not in patients.keys():
         return False
     return True
 
