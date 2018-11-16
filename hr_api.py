@@ -186,7 +186,7 @@ if __name__ == "__main__":
     p_id = ''.join(choice(ascii_uppercase) for _ in range(10))
     print(p_id)
     r = add_new_patient(p_id, "szx2@duke.edu", 21)
-    print(r, get_all_patients())
+    print(r)
     r = post_heart_rate(p_id, 80)
     print("Posted: ", r)
     hr = get_heart_rate(p_id)

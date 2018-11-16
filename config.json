@@ -1,3 +1,6 @@
 {
-    "SENDGRID_API_KEY": "totallylegitapikey"
+    "SENDGRID_API_KEY": "",
+    "from_email": "",
+    "mongo_user": "dukeuser",
+    "mongo_pass": "GODUKE10"
 }

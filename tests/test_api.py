@@ -11,7 +11,7 @@ def _new_patient_id():
 def test_get_all_patients():
     p_id = _new_patient_id()
     patient = hr_api.add_new_patient(p_id, "test@gmail.com", 21)
-    assert hr_api.get_all_patients()[p_id] == patient
+    assert hr_api.get_all_patients()[p_id]["patient_id"] == patient["patient_id"]
 
 
 def test_add_new_patient():

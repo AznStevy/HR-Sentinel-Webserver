@@ -5,6 +5,8 @@ from random import choice
 from string import ascii_uppercase
 from heart_rate_sentinel_server import get_app
 
+def _new_patient_id():
+    return ''.join(choice(ascii_uppercase) for _ in range(10))
 
 @pytest.fixture()
 def flask_app():
@@ -68,9 +70,12 @@ def test_post_new_patient_no_id(flask_app, patient_1_info):
 
 
 def test_post_new_patient_existing_id(flask_app, patient_1_info):
+    p_id = _new_patient_id()
+    new_patient = patient_1_info
+    new_patient["patient_id"] = p_id
     client = flask_app.test_client()
-    client.post('/api/new_patient', json=patient_1_info)
-    resp = client.post('/api/new_patient', json=patient_1_info)
+    client.post('/api/new_patient', json=new_patient)
+    resp = client.post('/api/new_patient', json=new_patient)
 
     assert resp.json["error_type"] == "ValueError"
 
@@ -86,13 +91,13 @@ def test_post_new_patient_no_email(flask_app):
 
 
 def test_post_new_patient_bad_email(flask_app, patient_1_info):
+    p_id = _new_patient_id()
+    new_patient = patient_1_info
+    new_patient["patient_id"] = p_id
+    new_patient["attending_email"] = "randomduke.edu"
+
     client = flask_app.test_client()
-    patient = {
-        "patient_id": 12303,
-        "attending_email": "randomduke.edu",
-        "user_age": 21
-    }
-    resp = client.post('/api/new_patient', json=patient)
+    resp = client.post('/api/new_patient', json=new_patient)
     assert resp.json["error_type"] == "ValueError"
 
 
@@ -124,10 +129,14 @@ def test_post_heart_rate_no_id(flask_app, patient_1_info, heart_rate_p1):
 
 
 def test_post_heart_rate_no_hr(flask_app, patient_1_info, heart_rate_p1):
+    p_id = _new_patient_id()
+    new_patient = patient_1_info
+    new_patient["patient_id"] = p_id
+
     client = flask_app.test_client()
-    client.post('/api/new_patient', json=patient_1_info)
+    client.post('/api/new_patient', json=new_patient)
     payload = {
-        "patient_id": 1
+        "patient_id": p_id
     }
     resp = client.post('/api/heart_rate', json=payload)
     assert resp.json["error_type"] == "AttributeError"
