@@ -42,11 +42,11 @@ def get_all_patients():
         dict: All patients currently in database referenced by ID.
 
     """
-    all_patients = get("all_patients").content.decode('utf-8')
-    return json.loads(all_patients)
+    resp = get("all_patients")
+    return byte_2_json(resp)
 
 
-def add_new_patient(patient_id, attending_email, user_age):
+def add_new_patient(patient_id: str, attending_email: str, user_age: int):
     """
     Adds new patient to the database.
     Args:
@@ -63,10 +63,10 @@ def add_new_patient(patient_id, attending_email, user_age):
         "user_age": user_age
     }
     resp = post("new_patient", payload)
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
 
 
-def get_interval_average(patient_id, timestamp):
+def get_interval_average(patient_id: str, timestamp: str):
     """
     Gets the average heart rate from before a timestamp.
     Args:
@@ -81,10 +81,10 @@ def get_interval_average(patient_id, timestamp):
         "heart_rate_average_since": timestamp,
     }
     resp = post("heart_rate/interval_average", payload)
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
 
 
-def post_heart_rate(patient_id, heart_rate):
+def post_heart_rate(patient_id: str, heart_rate: int):
     """
     Posts a heart rate to a patient. Timestamp automatically generated.
     Args:
@@ -100,10 +100,10 @@ def post_heart_rate(patient_id, heart_rate):
         "heart_rate": heart_rate,
     }
     resp = post("heart_rate", payload)
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
 
 
-def get_patient_status(patient_id):
+def get_patient_status(patient_id: str):
     """
     Obtains patient status. Sends email if tachychardic.
     Args:
@@ -114,10 +114,10 @@ def get_patient_status(patient_id):
 
     """
     resp = get("status/{}".format(patient_id))
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
 
 
-def get_heart_rate(patient_id):
+def get_heart_rate(patient_id: str):
     """
     Obtains all heart rates from the
     Args:
@@ -128,10 +128,10 @@ def get_heart_rate(patient_id):
 
     """
     resp = get("heart_rate/{}".format(patient_id))
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
 
 
-def get_heart_rate_average(patient_id):
+def get_heart_rate_average(patient_id: str):
     """
     Obtains an average heart rate of the patient.
     Args:
@@ -141,7 +141,42 @@ def get_heart_rate_average(patient_id):
         float: Average heart rate of the patient.
     """
     resp = get("heart_rate/average/{}".format(patient_id))
-    return json.loads(resp.content.decode('utf-8'))
+    return byte_2_json(resp)
+
+
+def byte_2_json(resp):
+    """
+    Converts bytes to json. Raises exception if necessary.
+    Args:
+        resp (bytes): Response from request.
+
+    Returns:
+        dict: Json object of interest.
+
+    """
+    json_resp = json.loads(resp.content.decode('utf-8'))
+    json_resp = error_catcher(json_resp)
+    return json_resp
+
+
+def error_catcher(json_resp: dict):
+    """
+    Raises appropriate exceptions from the web server.
+    Args:
+        json_resp: Information from the server.
+
+    Returns:
+        dict: The original dictionary if not error.
+
+    """
+    if type(json_resp) == dict and "error_type" in json_resp.keys():
+        if "TypeError" in json_resp["error_type"]:
+            raise TypeError(json_resp["msg"])
+        if "AttributeError" in json_resp["error_type"]:
+            raise AttributeError(json_resp["msg"])
+        if "ValueError" in json_resp["error_type"]:
+            raise ValueError(json_resp["msg"])
+    return json_resp
 
 
 if __name__ == "__main__":
@@ -150,7 +185,6 @@ if __name__ == "__main__":
 
     p_id = ''.join(choice(ascii_uppercase) for _ in range(10))
     print(p_id)
-    # p_id = "UZNUWUPQPI"
     r = add_new_patient(p_id, "szx2@duke.edu", 21)
     print(r, get_all_patients())
     r = post_heart_rate(p_id, 80)
