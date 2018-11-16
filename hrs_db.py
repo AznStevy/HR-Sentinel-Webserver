@@ -1,202 +1,143 @@
-import motor
-import datetime
+import json
+from pymodm import connect
+from pymodm import MongoModel, fields
+
+# read in credentials, screws with tests.
+try:
+    with open("config.json", 'r') as f:
+        config_info = json.load(f)
+        db_user = config_info["mongo_user"]
+        db_pass = config_info["mongo_pass"]
+except:
+    pass
+
+connect("mongodb://{}:<{}>@ds041337.mlab.com:41337/heart_rate_sentinel".format(
+    db_user, db_pass))
 
 
-class HRMDatabase(object):
-    def __init__(self, **kwargs):
-        self.db_name = kwargs.get("name", "hrm_database")
-        self.db_client = motor.motor_asyncio.AsyncIOMotorClient()
-        self.database = self.db_client[self.db_name]  # overall database, not collection
-        self.patients = self.database["patients"]
+class Patient(MongoModel):
+    patient_id = fields.CharField(primary_key=True)
+    attending_email = fields.EmailField()
+    user_age = fields.IntegerField()
+    heart_rates = fields.ListField()
+    timestamps = fields.ListField()
 
-    async def add_patient(self, new_patient):
+
+class HRDatabase(object):
+    def __init__(self):
+        pass
+
+    def get_all(self):
         """
-        Adds patient into the patient collection
+        Obtains a dictionary of every patient, accessible by ID. Testing only!
+        Returns:
+            dict: Patients in the database
+        """
+        ret_json = {}
+        for user in Patient.objects.raw({}):
+            ret_json[user.patient_id] = self.convert_to_json(user)
+        return ret_json
+
+    def add_patient(self, user_info):
+        """
+        Adds a new patient into the database.
         Args:
-            new_patient (dict): Dictionary of attributes that describe the patient
+            user_info (dict): Dictionary with the user's info.
+        """
+        if self.check_user_exists(user_info["patient_id"]):
+            raise ValueError("The patient is already in the database.")
+
+        p = Patient(patient_id=user_info["patient_id"],
+                    attending_email=user_info["attending_email"],
+                    user_age=user_info["user_age"],
+                    heart_rates=[],
+                    timestamps=[]
+                    )
+        p.save()
+
+    def remove_patient(self, patient_id):
+        """
+        Removes the patient from the database.
+        Args:
+            patient_id (str): ID of the patient to remove.
 
         Returns:
-            dict: Dictionary that was put into the database.
-
+            bool: Whether or not the user was removed.
         """
-        if type(new_patient) != dict:
-            raise TypeError("Must pass in type dict")
-
-        # additional checks for attributes
-        patient_id, patient_exists = await self._check_patient_id(new_patient)
-        user_age = self._check_user_age(new_patient)
-        attending_email = self._check_email(new_patient)
-
-        # verified object
-        verified_patient = {
-            "patient_id": patient_id,
-            "user_age": user_age,
-            "attending_email": attending_email,
-            "timestamps": [],
-            "heart_rates": []
+        query = {
+            "patient_id": patient_id
         }
+        removed = False
+        for user in Patient.objects.raw(query):
+            removed = True
+            user.delete()
+        return removed
 
-        await self.patients.insert_one(verified_patient)
-        return verified_patient
-
-    async def update_heart_rate(self, updated_patient):
+    def get_patient(self, patient_id):
         """
-        Update the information of an existing patient.
+        Finds the patient from the database.
         Args:
-            updated_patient (dict): Dictionary of attributes that describe the patient.
-        """
-        if type(updated_patient) != dict:
-            raise TypeError("Must pass in type dict")
-        if updated_patient.get("patient_id") is None:
-            raise AttributeError("Must contain patient_id")
-
-        # additional checks for attributes
-        patient_id = updated_patient.get("patient_id")
-        if not await self._check_patient_exists(patient_id):
-            raise ValueError("The patient does not exist. Please use add_patient.")
-        if "heart_rate" not in updated_patient.keys():
-            raise AttributeError("Must pass heart_rate attribute.")
-
-        # current patient information
-        current_time = str(datetime.now())
-        new_heartrate = self._check_heart_rate(updated_patient["heart_rate"])
-
-        await self.patients.update_one({"patient_id": patient_id}, {
-            '$push': {
-                "heart_rates": new_heartrate,
-                "timestamps": current_time
-            }
-        })
-
-    async def _check_heart_rate(self, heart_rate: int):
-        """
-        Checks the heart rate to see if it's valid.
-        Args:
-            heart_rate (int): Heart rate as an integer.
+            patient_id (str): ID of the patient to remove
 
         Returns:
-            int: The valid heart rate.
+            dict: Information of the patient. Returns None if DNE.
 
         """
-        if type(heart_rate) != int:
-            raise TypeError("heart_rate must be type int.")
-        if heart_rate < 0:
-            raise ValueError("This is not a valid heart rate.")
-        return heart_rate
+        query = {
+            "patient_id": patient_id
+        }
+        for user in Patient.objects.raw(query):
+            return user
+        return None
 
-    async def _check_patient_id(self, new_patient):
+    def add_hr(self, patient_id, heart_rate, timestamp):
         """
-        Checks if the patient id is valid.
+        Adds a heart rate and corresponding timestamp to a user.
         Args:
-            new_patient (dict): New patient who must contain patient_id
+            patient_id: ID of the patient to add hr to.
+            heart_rate: New heart rate.
+            timestamp: New timestamp.
+        """
+        query = {
+            "patient_id": patient_id
+        }
+        for user in Patient.objects.raw(query):
+            user.heart_rates.append(heart_rate)
+            user.timestamps.append(timestamp)
+            user.save()
+
+    def check_user_exists(self, patient_id):
+        """
+        Checks if the user exists in the database.
+        Args:
+            patient_id (str): ID
 
         Returns:
-            str: The verified patient id.
+            bool: Whether or not the user exists in the database.
 
         """
-        if new_patient.get("patient_id") is None:
-            raise AttributeError("Must contain patient_id")
-
-        patient_id = new_patient["patient_id"]
-        if type(patient_id) != str:
-            patient_id = str(patient_id)
-
-        patient_exists = await self._check_patient_exists(patient_id)
-        return patient_id, patient_exists
-
-    async def _check_patient_exists(self, patient_id: str):
-        """
-        Checks if the patient id exists within the database.
-        Args:
-            patient_id (str): The patient id that should be tested.
-
-        Returns:
-            bool: Whether or not the patient exists.
-
-        """
-        found_patient = await self.get_patient(patient_id)
-        if found_patient:
+        query = {
+            "patient_id": patient_id
+        }
+        if Patient.objects.raw(query):
             return True
         return False
 
-    def _check_user_age(self, new_patient):
+    def convert_to_json(self, db_object):
         """
-        Checks if the user's age of the object is valid.
+        Converts a database entry into a json object.
         Args:
-            new_patient (dict): the new patient that should be tested.
+            db_object: Database entry.
 
         Returns:
-            int: The new patient's age.
+            dict: Dictionary of the database entry.
 
         """
-        if new_patient.get("user_age") is None:
-            raise AttributeError("Must contain user_age")
-
-        user_age = new_patient["user_age"]
-        if type(user_age) != int:
-            raise TypeError("user_age must be type int")
-        if user_age < 0 or user_age > 120:
-            raise ValueError("user_age must be between 0 and 120.")
-        return user_age
-
-    def _check_email(self, new_patient):
-        """
-        Checks whether or not the new patient's email is valid.
-        Args:
-            new_patient: The new patient that should be tested.
-
-        Returns:
-            str: The verified email.
-
-        """
-        if new_patient.get("attending_email") is None:
-            raise AttributeError("Must contain attending_email")
-
-        attending_email = new_patient["attending_email"]
-        if type(attending_email) != str:
-            attending_email = str(attending_email)
-        if "@" not in attending_email:
-            raise ValueError("Please enter a valid email address/must contain @")
-        return attending_email
-
-    async def remove_patient(self, patient_id: str):
-        """
-        Removes patient from database based on ID
-        Args:
-            patient_id (str): The patient that should be removed.
-
-        Returns:
-            bool: Whether or not a patient was removed
-        """
-        patient_exists = await self._check_patient_exists(patient_id)
-        if not patient_exists:
-            return False
-
-        await self.patients.delete_one({'patient_id': patient_id})
-        return True
-
-    async def get_patient(self, patient_id: str):
-        """
-        Retrieves a patient's information
-        Args:
-            patient_id (str): The patient that is to be found.
-
-        Returns:
-            dict: Patient information from database.
-
-        """
-        found_patient = await self.patients.find_one({"patient_id": patient_id})
-        return found_patient
-
-    async def get_all_patients(self):
-        """
-        Retrieves all patient entries from the database.
-
-        Returns:
-            list: List of all patients.
-
-        """
-        all_patients = []
-        async for patient in self.patients.find_one({}):
-            all_patients.append(patient)
-        return all_patients
+        patient = {
+            "patient_id": db_object.patient_id,
+            "attending_email": db_object.attending_email,
+            "user_age": db_object.user_age,
+            "heart_rates": db_object.heart_rates,
+            "timestamps": db_object.timestamps,
+        }
+        return patient
