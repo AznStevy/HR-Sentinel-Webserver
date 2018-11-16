@@ -4,4 +4,5 @@ python:
 install:
         - pip install -r requirements.txt
 script:
+        - screen -S test -d -m python heart_rate_sentinel_server.py
         - pytest -pep8
